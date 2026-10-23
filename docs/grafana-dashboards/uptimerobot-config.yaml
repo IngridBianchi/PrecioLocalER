@@ -1,0 +1,137 @@
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "uptimerobot-config",
+    "namespace": "monitoring"
+  },
+  "data": {
+    "monitors.yaml": |
+      # UptimeRobot Monitor Configuration for PrecioLocal ER
+      # Import this via UptimeRobot API or configure manually in dashboard
+      #
+      # API: https://uptimerobot.com/api#createMonitor
+      # Docs: https://docs.uptimerobot.com/
+      #
+      # Free tier: 50 monitors, 5 min interval
+      # Pro tier: 100+ monitors, 1 min interval
+
+      monitors:
+        # Core services (public endpoints via nginx)
+        - name: "PrecioLocal - Web (nginx)"
+          url: "https://preciolocal-er.netlify.app"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - Scraper API"
+          url: "https://api.preciolocal-er.com/health"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - ML.NET API"
+          url: "https://api.preciolocal-er.com/api/health"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - Analytics Java"
+          url: "https://api.preciolocal-er.com/health"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - Gateway GraphQL"
+          url: "https://api.preciolocal-er.com/health"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        # Database connectivity (via service readiness endpoints)
+        - name: "PrecioLocal - Scraper Readiness (DB)"
+          url: "https://api.preciolocal-er.com/ready"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          keyword: "database.*true"
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - Analytics Readiness (DB + Mongo)"
+          url: "https://api.preciolocal-er.com/ready"
+          type: "http"
+          interval: 300
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          keyword: "postgres.*true.*mongodb.*true"
+          alert_contacts: ["email", "webhook"]
+
+        # Functional checks
+        - name: "PrecioLocal - Search API Functional"
+          url: "https://api.preciolocal-er.com/products?q=aceite"
+          type: "http"
+          interval: 600
+          timeout: 30
+          method: "GET"
+          expected_status: [200]
+          keyword: "products"
+          alert_contacts: ["email", "webhook"]
+
+        - name: "PrecioLocal - GraphQL API Functional"
+          url: "https://api.preciolocal-er.com/graphql"
+          type: "http"
+          interval: 600
+          timeout: 30
+          method: "POST"
+          post_body: '{"query":"{ health { status } }"}'
+          headers:
+            - "Content-Type: application/json"
+          expected_status: [200]
+          alert_contacts: ["email", "webhook"]
+
+        # SSL Certificate expiry
+        - name: "PrecioLocal - SSL Certificate (preciolocal-er.com)"
+          url: "preciolocal-er.com"
+          type: "port"
+          port: 443
+          interval: 1440
+          timeout: 30
+          alert_contacts: ["email"]
+          ssl_expiry_alert: 30  # Alert 30 days before expiry
+
+      # Alert contacts (configure in UptimeRobot dashboard)
+      alert_contacts:
+        - id: "email"
+          type: "email"
+          value: "alerts@preciolocal-er.com"
+        - id: "webhook"
+          type: "webhook"
+          url: "https://api.preciolocal-er.com/webhooks/uptimerobot"
+          headers:
+            - "Authorization: Bearer ${UPTIMEROBOT_WEBHOOK_SECRET}"
+
+      # Maintenance windows
+      maintenance_windows:
+        - name: "Weekly DB Maintenance"
+          start_time: "03:00"
+          duration_minutes: 30
+          days: ["sunday"]
+          timezone: "America/Argentina/Buenos_Aires"

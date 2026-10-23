@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+      - "web/**"
+      - "db/**"
+      - ".github/workflows/deploy.yml"
+
+# Fase 0: esqueleto. En Fases 1-7 se completa:
+# 1. build + push imágenes a GHCR (scraper, ml-dotnet, analytics-java, gateway)
+# 2. disparo de deploy via webhooks: Render (scraper/dotnet/gateway), Railway (java), Netlify (web)
+# 3. smoke test post-deploy: curl /health de cada servicio
+
+# Hardening WP1: permisos mínimos + Actions por SHA.
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Smoke test placeholder
+        run: echo "Deploy real configurado en Fases 1-7 (ver docs/deploy.md)"
+
+      - name: Notify webhooks
+        env:
+          RENDER_DEPLOY_HOOKS: ${{ secrets.RENDER_DEPLOY_HOOKS }}
+          RAILWAY_DEPLOY_HOOK: ${{ secrets.RAILWAY_DEPLOY_HOOK }}
+          NETLIFY_DEPLOY_HOOK: ${{ secrets.NETLIFY_DEPLOY_HOOK }}
+        run: |
+          # Se activa cuando existan los hooks de deploy
+          echo "Webhooks preparados (Fases 1-7)"

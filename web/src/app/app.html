@@ -1,0 +1,32 @@
+<a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+<header class="topbar">
+  <div class="brand-group">
+    <a routerLink="/" class="brand">PrecioLocal <span>ER</span></a>
+    <span class="tagline">Precios de supermercados de Entre Ríos</span>
+  </div>
+  <nav class="main-nav" aria-label="Navegación principal">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Buscar</a>
+    <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+    <a routerLink="/comparador" routerLinkActive="active">Comparador</a>
+    <a routerLink="/alertas" routerLinkActive="active">Alertas</a>
+    <button
+      type="button"
+      class="theme-toggle"
+      (click)="toggleTheme()"
+      [attr.aria-label]="theme() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+      [attr.aria-pressed]="theme() === 'dark'"
+    >
+      {{ theme() === 'dark' ? '☀' : '☾' }}
+    </button>
+  </nav>
+</header>
+
+<main id="main-content" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <span>Precios capturados del sitio web de cada cadena. Datos orientativos, no oficiales.</span>
+</footer>
+
+<app-notification-container />

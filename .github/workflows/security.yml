@@ -1,0 +1,112 @@
+name: Security
+
+on:
+  push:
+    # `master` también: el repo está en `master` y `ci.yml` ya dispara en las
+    # dos ramas (§15 C1). Con solo `main`, gitleaks y trivy no corrían nunca
+    # sobre la rama real —el mismo falso verde que ya se corrigió en CI.
+    branches: [master, main]
+  pull_request:
+  schedule:
+    - cron: "0 0 * * 0" # domingo
+
+# Hardening WP1: permisos mínimos (A05) y Actions fijadas por SHA
+# (A06: un tag movible es supply chain ejecutable).
+# El token de gitleaks necesita `contents: read` + `security-events`
+# solo si se suben resultados; por defecto no escribe nada.
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Solo tiene sentido en PRs: evita ruido en pushes a main.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Dependency Review
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+
+  trivy-fs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@049265f07b2c86c4d50f97941e0e3f1d5977b0d5 # v3.28.0
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  trivy-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    needs: [trivy-fs]
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build scraper image
+        run: docker build -t preciolocal/scraper:test -f services/scraper/Dockerfile services/scraper
+      - name: Build ml-dotnet image
+        run: docker build -t preciolocal/ml-dotnet:test -f services/ml-dotnet/Dockerfile services/ml-dotnet
+      - name: Build web image
+        run: docker build -t preciolocal/web:test -f web/Dockerfile web
+      - name: Trivy image scan (scraper)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'image'
+          scan-ref: 'preciolocal/scraper:test'
+          format: 'sarif'
+          output: 'trivy-scraper.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Trivy image scan (ml-dotnet)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'image'
+          scan-ref: 'preciolocal/ml-dotnet:test'
+          format: 'sarif'
+          output: 'trivy-ml-dotnet.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Trivy image scan (web)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'image'
+          scan-ref: 'preciolocal/web:test'
+          format: 'sarif'
+          output: 'trivy-web.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Upload Trivy image results
+        uses: github/codeql-action/upload-sarif@049265f07b2c86c4d50f97941e0e3f1d5977b0d5 # v3.28.0
+        with:
+          sarif_file: 'trivy-*.sarif'
+          category: 'trivy-image'

@@ -1,0 +1,245 @@
+# Infraestructura local de PrecioLocal ER
+# Hardening 2026-09-25 (WP1, docs/security.md §2):
+#   - puertos publicados SOLO en 127.0.0.1 (no accesibles desde la LAN)
+#   - Redis con requirepass; credenciales fuera del compose (ver .env)
+#   - sin credenciales por defecto "de fábrica": si falta la password, el
+#     servicio falla al arrancar en vez de exponer un default conocido
+#   - scraper corre como usuario no-root
+# Uso: docker compose up -d
+
+name: preciolocal-er
+
+x-required-env: &required-env
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+  MONGO_PASSWORD: ${MONGO_PASSWORD:?falta MONGO_PASSWORD en .env}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?falta REDIS_PASSWORD en .env}
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pl-postgres
+    restart: unless-stopped
+    environment:
+      <<: *required-env
+      POSTGRES_USER: ${POSTGRES_USER:-preciolocal}
+      POSTGRES_DB: ${POSTGRES_DB:-preciolocal}
+    ports:
+      # Loopback únicamente: no exponemos Postgres a la red local.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/supabase/migrations:/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-preciolocal} -d ${POSTGRES_DB:-preciolocal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: pl-redis
+    restart: unless-stopped
+    # requirepass vía env: evita que la credencial quede en el command line
+    # (visible con `docker inspect` / ps a cualquier usuario del host).
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?falta REDIS_PASSWORD en .env}
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --save 900 1 --appendonly no
+    ports:
+      # Ojo: ya hay Redis nativos en 6379 y 6380 en esta máquina → usamos 6381.
+      - "127.0.0.1:${REDIS_PORT:-6381}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: pl-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-preciolocal}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?falta MONGO_PASSWORD en .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-preciolocal}
+    ports:
+      # Ojo: ya hay un Mongo nativo en 27017 en esta máquina → usamos 27018.
+      # El default coincide con .env.example (antes era 27017 y el compose
+      # fallaba al bindear sin .env).
+      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  scraper:
+    build: ./services/scraper
+    container_name: pl-scraper
+    restart: unless-stopped
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      # Rol de servicio, NO el superusuario del contenedor (P0.1): conectar como
+      # POSTGRES_USER hacía que la RLS fuera inerte, porque el superusuario tiene
+      # rolbypassrls y se la saltea entera. El rol se crea y rota con
+      # `make db-roles` / `scripts/db-rotate-roles.sh`; si la password no está en
+      # .env, este target falla en vez de volver al superusuario en silencio.
+      DATABASE_URL: postgresql://${SCRAPER_DB_USER:-preciolocal_scraper}:${SCRAPER_DB_PASSWORD:?falta SCRAPER_DB_PASSWORD en .env (make db-roles)}@postgres:5432/${POSTGRES_DB:-preciolocal}
+      REDIS_URL: ${REDIS_URL:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?falta REDIS_PASSWORD en .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      COTO_DIGITAL_API_KEY: ${COTO_DIGITAL_API_KEY:-}
+      # El default de la app (30/min, OWASP A04) se respeta; se sube solo si
+      # hace falta, porque todo el tráfico del E2E de browser llega por nginx
+      # con la MISMA IP de origen y 25 tests lo barren en ~13 s. Ver
+      # docs/testing.md §3.3.
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-30}
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      # Allow-list de proxies de confianza para uvicorn (`--forwarded-allow-ips`).
+      # Antes era "*": con eso, uvicorn da por bueno el `X-Forwarded-For` de
+      # cualquiera que hable con el puerto 8000 y un cliente puede forjar su IP
+      # para esquivar el rate limit. Acá se confía SOLO la IP fija de nginx
+      # (ver `web.networks`), no la subred entera: así ni el gateway de Docker
+      # ni otro contenedor pueden firmarlo.
+      TRUSTED_PROXY_IP: ${TRUSTED_PROXY_IP:-10.99.0.10}
+    ports:
+      - "127.0.0.1:${SCRAPER_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ml-dotnet:
+    build: ./services/ml-dotnet
+    container_name: pl-ml-dotnet
+    restart: unless-stopped
+    environment:
+      # Npgsql no acepta URI postgresql://; el servicio lo traduce a key=value.
+      # Rol de servicio propio (`pl_ml`), distinto del del scraper: .NET solo
+      # lee precios, y compartir credenciales con quien escribe no separa nada
+      # (P0.1).
+      DATABASE_URL: postgresql://${ML_DB_USER:-preciolocal_ml}:${ML_DB_PASSWORD:?falta ML_DB_PASSWORD en .env (make db-roles)}@postgres:5432/${POSTGRES_DB:-preciolocal}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      # Misma allow-list que el scraper: sin esto, el `KnownNetworks`/`KnownProxies`
+      # default de Kestrel solo conoce loopback y descarta el XFF, dejando el
+      # bucket de rate limit colgado de la IP de nginx para todos los clientes
+      # (MEJORAS.md P0.2).
+      TRUSTED_PROXY_IP: ${TRUSTED_PROXY_IP:-10.99.0.10}
+    ports:
+      - "127.0.0.1:${ML_DOTNET_PORT:-8001}:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  analytics-java:
+    build: ./services/analytics-java
+    container_name: pl-analytics-java
+    restart: unless-stopped
+    profiles:
+      - analytics
+    environment:
+      # R2DBC URL format: r2dbc:postgresql://host:port/db
+      R2DBC_URL: r2dbc:postgresql://postgres:5432/${POSTGRES_DB:-preciolocal}
+      POSTGRES_USER: ${ANALYTICS_DB_USER:-preciolocal_analytics}
+      POSTGRES_PASSWORD: ${ANALYTICS_DB_PASSWORD:?falta ANALYTICS_DB_PASSWORD en .env (make db-roles)}
+      # authSource=admin: el usuario raíz de Mongo vive en `admin`, no en la
+      # base de la aplicación. Sin esto el driver intenta autenticar contra
+      # preciolocal_analytics y falla con AuthenticationFailed.
+      MONGODB_URI: mongodb://${MONGO_USER:-preciolocal}:${MONGO_PASSWORD:?falta MONGO_PASSWORD en .env}@mongo:27017/preciolocal_analytics?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?falta REDIS_PASSWORD en .env}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-production}
+    ports:
+      - "127.0.0.1:${ANALYTICS_JAVA_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  gateway:
+    build: ./services/gateway
+    container_name: pl-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${GATEWAY_PORT:-4000}
+      SCRAPER_URL: http://scraper:8000
+      ML_DOTNET_URL: http://ml-dotnet:8001
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      SUPABASE_JWKS_URL: ${SUPABASE_JWKS_URL}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
+      RATE_LIMIT_MAX: ${GATEWAY_RATE_LIMIT_PER_MIN:-100}
+      RATE_LIMIT_WINDOW: "1 minute"
+      REDIS_URL: ${REDIS_URL:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: gateway
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-4000}:4000"
+    depends_on:
+      scraper:
+        condition: service_healthy
+      ml-dotnet:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    container_name: pl-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-4200}:80"
+    # IP fija: es la identidad que scraper y ml-dotnet authorize como único
+    # proxy confiable (`TRUSTED_PROXY_IP`). Sin IP fija no se puede nombrar al
+    # emisor del XFF y todo vuelve a depender de un header o de un rango.
+    networks:
+      default:
+        ipv4_address: ${TRUSTED_PROXY_IP:-10.99.0.10}
+    depends_on:
+      scraper:
+        condition: service_healthy
+      ml-dotnet:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  mongodata:
+
+# Subred interna con número fijo.
+#
+# Por qué: el rate limit del scraper y de ml-dotnet se particiona por IP de
+# cliente, y la única forma de que esa IP sea la del cliente real (y no un
+# header que cualquiera pueda mandar) es que el proxy de entrada sea el ÚNICO
+# que nginx acepta como emisor de `X-Forwarded-For`. Eso requiere poder nombrar
+# la red en una allow-list, y una red de compose con subred dinámica no se
+# puede nombrar. Ver docs/security.md §3 y MEJORAS.md P0.2.
+#
+# 10.99.0.0/24 está fuera de los rangos que Docker asigna solos
+# (172.17.0.0/16 → 172.31.0.0/16), así que no colisiona con otras redes ni con
+# la LAN. `TRUSTED_PROXY_IP` tiene que caer adentro de este rango; el E2E lo
+# verifica (proxy-contrato.spec.ts) porque si se salen de sync la allow-list
+# queda inservible y el rate limit vuelve a colgar de nginx.
+#
+# Si tocás INTERNAL_SUBNET o TRUSTED_PROXY_IP, levantá con `--force-recreate`:
+# un `up -d` normal no recrea los contenedores cuyo service config no cambió y
+# se quedan apuntando a la red vieja, con el alias de DNS (`postgres`,
+# `scraper`) sin registrar — el scraper muere con "No address associated with
+# hostname" y la causa no parece tener nada que ver con el cambio.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${INTERNAL_SUBNET:-10.99.0.0/24}

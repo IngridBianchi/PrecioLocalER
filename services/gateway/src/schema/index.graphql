@@ -1,0 +1,524 @@
+# PrecioLocal ER - GraphQL Schema
+# Federation-ready schema for the unified API gateway
+
+scalar DateTime
+scalar Decimal
+scalar JSONObject
+
+"""
+Dirección de la alerta
+"""
+enum AlertDirection {
+  BELOW
+  ABOVE
+}
+
+"""
+Período para reportes
+"""
+enum ReportPeriod {
+  DAY
+  WEEK
+  MONTH
+}
+
+"""
+Cadena de supermercado
+"""
+type Chain {
+  id: ID!
+  name: String!
+  slug: String!
+  domain: String
+  active: Boolean!
+}
+
+"""
+Marca de producto
+"""
+type Brand {
+  id: ID!
+  name: String!
+  slug: String!
+}
+
+"""
+Categoría de producto
+"""
+type Category {
+  id: ID!
+  name: String!
+  slug: String!
+  parent: Category
+  children: [Category!]!
+}
+
+"""
+Producto canónico (normalizado entre cadenas)
+"""
+type Product {
+  id: ID!
+  name: String!
+  normalizedName: String!
+  brand: Brand
+  category: Category
+  sizeQuantity: Float
+  sizeUnit: String!
+  ean: String
+  skus(chain: String): [ProductSku!]!
+  prices: [PricePoint!]!
+}
+
+"""
+Variante real de venta por cadena (SKU)
+"""
+type ProductSku {
+  id: ID!
+  product: Product!
+  chain: Chain!
+  externalId: String!
+  name: String!
+  url: String
+  ean: String
+  active: Boolean!
+  firstSeenAt: DateTime!
+  lastSeenAt: DateTime!
+}
+
+"""
+Punto de precio (precio capturado en un momento)
+"""
+type PricePoint {
+  id: ID!
+  productId: ID!
+  chain: String!
+  chainId: Int!
+  skuId: Int
+  storeId: Int
+  price: Decimal!
+  promoType: String
+  capturedAt: DateTime!
+  scrapedAt: DateTime!
+  hash: String!
+}
+
+"""
+Sucursal
+"""
+type Store {
+  id: ID!
+  chain: Chain!
+  name: String!
+  city: String!
+  address: String
+  lat: Float
+  lng: Float
+}
+
+"""
+Predicción de precio (forecast)
+"""
+type PricePrediction {
+  date: DateTime!
+  predictedPrice: Decimal!
+  confLow: Decimal
+  confHigh: Decimal
+}
+
+"""
+Forecast completo para un producto
+"""
+type Forecast {
+  productId: ID!
+  chain: String
+  requestedModel: String!
+  model: String!
+  degradedReason: String
+  nPoints: Int!
+  mape: Float
+  rmse: Float
+  mae: Float
+  points: [PricePrediction!]!
+}
+
+"""
+Anomalía detectada
+"""
+type Anomaly {
+  id: ID!
+  productId: ID!
+  chain: String!
+  pricePointId: ID!
+  price: Decimal!
+  expectedPrice: Decimal!
+  score: Float!
+  detectedAt: DateTime!
+}
+
+"""
+Respuesta de anomalías
+"""
+type AnomaliesResponse {
+  productId: ID!
+  chain: String
+  nPoints: Int!
+  nAnomalies: Int!
+  detector: String!
+  anomalies: [Anomaly!]!
+}
+
+"""
+Reporte de inflación por categoría
+"""
+type InflationReport {
+  period: ReportPeriod!
+  span: String!
+  categories: [CategoryInflation!]!
+  overallInflation: Float!
+  generatedAt: DateTime!
+}
+
+type CategoryInflation {
+  category: Category!
+  inflation: Float!
+  productCount: Int!
+  avgPriceChange: Float!
+}
+
+"""
+Top movers (productos con mayor variación)
+"""
+type TopMoversReport {
+  period: ReportPeriod!
+  span: String!
+  gainers: [PriceMover!]!
+  losers: [PriceMover!]!
+  generatedAt: DateTime!
+}
+
+type PriceMover {
+  product: Product!
+  chain: Chain!
+  priceChange: Float!
+  priceChangePct: Float!
+  currentPrice: Decimal!
+  previousPrice: Decimal!
+}
+
+"""
+Alerta de usuario
+"""
+type Alert {
+  id: ID!
+  userId: ID!
+  product: Product!
+  direction: AlertDirection!
+  targetPrice: Decimal!
+  active: Boolean!
+  lastTriggeredAt: DateTime
+  createdAt: DateTime!
+}
+
+"""
+Evento de alerta disparada
+"""
+type AlertEvent {
+  id: ID!
+  alert: Alert!
+  pricePoint: PricePoint!
+  price: Decimal!
+  triggeredAt: DateTime!
+}
+
+"""
+Input para crear alerta
+"""
+input CreateAlertInput {
+  productId: ID!
+  direction: AlertDirection!
+  targetPrice: Decimal!
+}
+
+"""
+Respuesta de mutation
+"""
+type MutationResponse {
+  success: Boolean!
+  message: String
+  data: JSONObject
+}
+
+"""
+Job de scrape
+"""
+type ScrapeJob {
+  chain: String!
+  status: String!
+  productsFound: Int
+  pricePointsInserted: Int
+  errors: Int
+  startedAt: DateTime!
+  finishedAt: DateTime
+}
+
+# ============================================================
+# QUERIES
+# ============================================================
+
+type Query {
+  """
+  Health check del gateway
+  """
+  health: HealthStatus!
+
+  """
+  Búsqueda de productos con normalización
+  """
+  searchProducts(
+    q: String!
+    chain: String
+    limit: Int = 20
+    offset: Int = 0
+  ): ProductSearchResult!
+
+  """
+  Detalle de un producto por ID
+  """
+  product(id: ID!): Product
+
+  """
+  Comparar precios del mismo producto entre cadenas
+  """
+  compare(productIds: [ID!]!): [PriceComparison!]!
+
+  """
+  Histórico de precios de un producto
+  """
+  priceHistory(
+    productId: ID!
+    span: String = "30d"
+    chain: String
+  ): [PricePoint!]!
+
+  """
+  Forecast de precio (modelo Python SARIMAX/Holt-Winters)
+  """
+  forecast(
+    productId: ID!
+    chain: String
+    horizon: Int = 7
+  ): Forecast
+
+  """
+  Forecast comparativo (Python vs .NET)
+  """
+  forecastComparison(
+    productId: ID!
+    chain: String!
+  ): [ModelComparison!]!
+
+  """
+  Anomalías de precio para un producto
+  """
+  anomalies(
+    productId: ID!
+    chain: String
+    days: Int = 30
+  ): AnomaliesResponse
+
+  """
+  Reporte de inflación por categoría
+  """
+  inflationReport(
+    span: String = "30d"
+  ): InflationReport
+
+  """
+  Top movers (mayores variaciones de precio)
+  """
+  topMovers(
+    span: String = "30d"
+    top: Int = 20
+  ): TopMoversReport
+
+  """
+  Reporte de precios por categoría
+  """
+  categoryReport(
+    categorySlug: String!
+    chain: String
+    limit: Int = 50
+  ): [CategoryPricePoint!]!
+
+  """
+  Listar cadenas disponibles
+  """
+  chains: [Chain!]!
+
+  """
+  Alertas activas del usuario
+  """
+  myAlerts: [Alert!]!
+
+  """
+  Historial de eventos de alerta del usuario
+  """
+  alertEvents(limit: Int = 50): [AlertEvent!]!
+}
+
+type HealthStatus {
+  status: String!
+  service: String!
+  timestamp: DateTime!
+  checks: HealthChecks!
+}
+
+type HealthChecks {
+  scraper: Boolean!
+  mlDotnet: Boolean!
+  analyticsJava: Boolean!
+  postgres: Boolean!
+  redis: Boolean!
+  mongo: Boolean!
+}
+
+"""
+Resultado de búsqueda: producto + precio actual por cadena.
+Una fila por (producto, cadena), con el último price_point de esa cadena.
+"""
+type ProductSearchHit {
+  id: ID!
+  name: String!
+  normalizedName: String!
+  brand: String
+  category: String
+  categorySlug: String
+  sizeQuantity: Float
+  sizeUnit: String!
+  ean: String
+  chain: String!
+  chainName: String!
+  price: Decimal!
+  promoType: String
+  capturedAt: DateTime!
+}
+
+type ProductSearchResult {
+  products: [ProductSearchHit!]!
+  total: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+type PriceComparison {
+  product: Product!
+  prices: [ChainPrice!]!
+}
+
+type ChainPrice {
+  chain: Chain!
+  sku: ProductSku
+  price: Decimal!
+  promoType: String
+  capturedAt: DateTime!
+}
+
+type ModelComparison {
+  model: String!
+  language: String!
+  mape: Float
+  rmse: Float
+  mae: Float
+  numPoints: Int!
+  trainedAt: DateTime!
+}
+
+# ============================================================
+# MUTATIONS
+# ============================================================
+
+type Mutation {
+  """
+  Crear alerta de precio para el usuario autenticado
+  """
+  createAlert(input: CreateAlertInput!): Alert!
+
+  """
+  Activar/desactivar alerta
+  """
+  toggleAlert(id: ID!, active: Boolean!): Alert!
+
+  """
+  Eliminar alerta
+  """
+  deleteAlert(id: ID!): MutationResponse!
+
+  """
+  Ejecutar scrape manual (solo admin)
+  """
+  runScrape(chain: String!): ScrapeJob!
+
+  """
+  Re-entrenar modelos ML (solo admin)
+  """
+  retrainModels(chain: String): MutationResponse!
+}
+
+# ============================================================
+# SUBSCRIPTIONS
+# ============================================================
+
+type Subscription {
+  """
+  Actualizaciones de precio en tiempo real para un producto
+  """
+  onPriceUpdate(productId: ID!): PricePoint!
+
+  """
+  Alertas disparadas en tiempo real para el usuario autenticado
+  """
+  onAlertTriggered: AlertEvent!
+}
+
+# ============================================================
+# DIRECTIVES
+# ============================================================
+
+"""
+Rate limit por campo (usa graphql-rate-limit-directive)
+"""
+directive @rateLimit(
+  """
+  Máximo de requests permitidos en la ventana
+  """
+  max: Int!,
+  """
+  Ventana en segundos
+  """
+  window: String!,
+  """
+  Mensaje de error personalizado
+  """
+  message: String
+) on FIELD_DEFINITION
+
+"""
+Requiere autenticación (usuario logueado)
+"""
+directive @auth on FIELD_DEFINITION
+
+"""
+Solo admin
+"""
+directive @admin on FIELD_DEFINITION
+
+type CategoryPricePoint {
+  id: ID!
+  productId: ID!
+  productName: String!
+  chain: String!
+  chainId: Int!
+  price: Decimal!
+  promoType: String
+  capturedAt: DateTime!
+}

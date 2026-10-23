@@ -1,0 +1,57 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/services/scraper"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    commit-message:
+      prefix: "deps(scraper)"
+
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "security"
+    commit-message:
+      prefix: "deps(web)"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+      - "security"
+    commit-message:
+      prefix: "deps(docker)"
+
+  - package-ecosystem: "nuget"
+    directory: "/services/ml-dotnet"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "dotnet"
+      - "security"
+    commit-message:
+      prefix: "deps(ml-dotnet)"

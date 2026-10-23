@@ -1,0 +1,83 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/favicon-16x16.png",
+          "/favicon-32x32.png",
+          "/apple-touch-icon.png",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "/*.map",
+          "/index.html"
+        ]
+      }
+    },
+    {
+      "name": "icons",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/icons/icon-72x72.png",
+          "/icons/icon-96x96.png",
+          "/icons/icon-128x128.png",
+          "/icons/icon-144x144.png",
+          "/icons/icon-152x152.png",
+          "/icons/icon-192x192.png",
+          "/icons/icon-384x384.png",
+          "/icons/icon-512x512.png",
+          "/icons/icon-maskable-512x512.png"
+        ]
+      }
+    },
+    {
+      "name": "fonts",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/fonts/*.woff2",
+          "/assets/fonts/*.woff"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "graphql",
+      "urls": ["/graphql"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 100,
+        "maxAge": "1h",
+        "timeout": "5s"
+      }
+    },
+    {
+      "name": "api",
+      "urls": ["/api/**", "/products/**", "/chains", "/ml/**"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 200,
+        "maxAge": "30m",
+        "timeout": "5s"
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/",
+    "/dashboard",
+    "/comparador",
+    "/alertas",
+    "/predicciones/**",
+    "/producto/**"
+  ]
+}

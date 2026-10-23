@@ -1,0 +1,96 @@
+<section>
+  <header class="search-header">
+    <h1>Buscar precios</h1>
+  </header>
+
+  <h2 class="visually-hidden">Buscar productos</h2>
+
+  <label class="search-box" for="q">
+    <span class="visually-hidden">Buscar producto</span>
+    <span class="search-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </span>
+    <input
+      id="q"
+      type="search"
+      placeholder="Buscar producto, marca o categoría…"
+      autocomplete="off"
+      [formControl]="query"
+    />
+  </label>
+
+  <div class="filter">
+    <app-chain-picker
+      [chains]="chains()"
+      [value]="chain()"
+      [counts]="chainCounts()"
+      [totalCount]="totalChainCount()"
+      (valueChange)="setChain($event)"
+    />
+  </div>
+
+  @if (loading()) {
+    <div class="progress-container" role="status" aria-live="polite" aria-busy="true">
+      <div class="progress-bar progress-bar--indeterminate"></div>
+      <span class="progress-text">Buscando…</span>
+    </div>
+  }
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+    <button type="button" class="retry-btn" (click)="triggerSearch()">Reintentar</button>
+  }
+
+  @if (displayedResults().length === 0 && query.value.trim().length < 2 && !loading() && !error()) {
+    <div class="empty-state" role="status">
+      <svg class="empty-illustration" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <p class="hint">Escribí al menos 2 caracteres para buscar. Probá con “aceite”, “leche” o “pan”.</p>
+    </div>
+  }
+
+  @if (displayedResults().length === 0 && query.value.trim().length >= 2 && !loading() && !error()) {
+    <p class="hint" role="status">Sin resultados para “{{ query.value.trim() }}”.</p>
+  }
+
+  @if (displayedResults().length > 0) {
+    <p class="hint results-count" role="status">
+      {{ offset() + 1 }}–{{ offset() + displayedResults().length }} de {{ total() }} resultados
+    </p>
+
+    <ul class="results">
+      @for (r of displayedResults(); track r.chain + '-' + r.id) {
+        <li>
+          <a class="card" [routerLink]="['/producto', r.id]" [queryParams]="{ chain: chain() }">
+            <div class="card-main">
+              <span class="card-name">{{ r.name }}</span>
+              <span class="card-meta">
+                {{ r.brand ?? 'Sin marca' }}{{ r.category ? ' · ' + r.category : '' }}
+              </span>
+            </div>
+            <div class="card-side">
+              @if (r.promo_type; as promo) {
+                <span class="badge promo">{{ formatPromo(promo) }}</span>
+              }
+              <span class="price">{{ formatPrice(r.price) }}</span>
+              <span class="card-meta">{{ r.chain_name }} · {{ formatDate(r.captured_at) }}</span>
+            </div>
+          </a>
+        </li>
+      }
+    </ul>
+
+    @if (pages() > 1) {
+      <nav class="pager" aria-label="Paginación de resultados">
+        <button type="button" (click)="previousPage()" [disabled]="page() === 1">Anterior</button>
+        <span>Página {{ page() }} de {{ pages() }}</span>
+        <button type="button" (click)="nextPage()" [disabled]="page() >= pages()">Siguiente</button>
+      </nav>
+    }
+  }
+</section>

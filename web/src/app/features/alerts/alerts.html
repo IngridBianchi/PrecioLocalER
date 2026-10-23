@@ -1,0 +1,210 @@
+<section class="alerts" aria-label="Gestión de alertas de precios">
+  <header class="alerts-header">
+    <h1>Alertas</h1>
+    <p class="subtitle">Recibe notificaciones cuando un precio alcance tu objetivo</p>
+  </header>
+
+  <div *ngIf="!auth.isAuthenticated" class="auth-required">
+    <div class="card auth-card">
+      <div class="auth-content">
+        <svg class="auth-illustration" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <h2>Inicia sesión para usar alertas</h2>
+        <p>Las alertas están vinculadas a tu cuenta. Regístrate o entra para crear y gestionar tus alertas de precios.</p>
+        <div class="auth-actions">
+          <button class="btn btn-primary" (click)="auth.signInWithEmail('')">Entrar con email</button>
+          <button class="btn btn-google" (click)="auth.signInWithOAuth('google')">
+            <svg class="google-icon" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            Continuar con Google
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="auth.isAuthenticated" class="alerts-content">
+    <!-- Create Alert Form -->
+    <section class="card create-alert-card" *ngIf="showCreateForm()" aria-labelledby="create-title">
+      <header class="card-header">
+        <h2 id="create-title">Crear nueva alerta</h2>
+        <button class="icon-btn" (click)="toggleCreateForm()" aria-label="Cerrar">×</button>
+      </header>
+
+      <form (ngSubmit)="createAlert()" class="create-form">
+        <div class="form-field">
+          <label for="product-search">Producto</label>
+          <div class="search-wrapper">
+            <input
+              id="product-search"
+              type="text"
+              placeholder="Buscar producto..."
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="product-search-results"
+              [attr.aria-expanded]="showSearchResults()"
+              [value]="searchProduct()"
+              (input)="onProductSearch($event)"
+              (keydown)="onSearchKeydown($event)"
+              (focus)="searchProduct().length >= 2 && showSearchResults.set(true)"
+              (blur)="onSearchBlur()"
+              autocomplete="off"
+              [disabled]="creating()"
+              required
+            />
+            <div
+              id="product-search-results"
+              class="search-results"
+              *ngIf="showSearchResults() && searchResults().length > 0"
+            >
+              <ul role="listbox" aria-label="Productos encontrados">
+                <li
+                  *ngFor="let r of searchResults(); let i = index"
+                  role="option"
+                  [attr.aria-selected]="activeIndex() === i"
+                  [class.selected]="activeIndex() === i"
+                  (click)="selectProduct(r)"
+                >
+                  {{ r.name }} <span class="brand">{{ r.brand }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p class="field-error" *ngIf="!selectedProduct && searchProduct()">Selecciona un producto de la lista</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="alert-direction">Condición</label>
+            <select id="alert-direction" [(ngModel)]="direction" name="direction" [disabled]="creating()">
+              <option value="BELOW">📉 Cuando baje de</option>
+              <option value="ABOVE">📈 Cuando suba de</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="target-price">Precio objetivo (ARS)</label>
+            <input
+              id="target-price"
+              type="number"
+              step="0.01"
+              min="0"
+              [(ngModel)]="targetPrice"
+              name="targetPrice"
+              placeholder="Ej: 1500"
+              [disabled]="creating()"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" (click)="toggleCreateForm()" [disabled]="creating()">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="creating() || !selectedProduct || !targetPrice">
+            {{ creating() ? 'Creando...' : 'Crear alerta' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <button *ngIf="!showCreateForm()" class="btn btn-primary fab" (click)="toggleCreateForm()" aria-label="Crear alerta">
+      <span class="fab-icon">+</span>
+      <span class="fab-text">Nueva alerta</span>
+    </button>
+
+    <!-- Active Alerts -->
+    <section class="card" *ngIf="alerts().length > 0" aria-labelledby="active-title">
+      <header class="card-header">
+        <h2 id="active-title">Tus alertas ({{ activeAlertsCount() }} activas)</h2>
+      </header>
+
+      <div class="alerts-list">
+        <article *ngFor="let alert of alerts()" class="alert-card" [class.inactive]="!alert.active">
+          <div class="alert-main">
+            <div class="alert-product">
+              <h3>{{ alert.product.name }}</h3>
+              <span class="alert-brand" *ngIf="alert.product.brand">{{ alert.product.brand.name }}</span>
+              <span class="alert-size" *ngIf="alert.product.sizeQuantity">
+                {{ alert.product.sizeQuantity }}{{ alert.product.sizeUnit }}
+              </span>
+            </div>
+
+            <div class="alert-condition">
+              <span class="direction-badge" [class.below]="alert.direction === 'BELOW'" [class.above]="alert.direction === 'ABOVE'">
+                {{ alert.direction === 'BELOW' ? '📉 Baja de' : '📈 Sube de' }}
+              </span>
+              <span class="target-price">{{ money(alert.targetPrice) }}</span>
+            </div>
+
+            <div class="alert-status">
+              <label class="toggle">
+                <input
+                  type="checkbox"
+                  [checked]="alert.active"
+                  (change)="toggleAlert(alert)"
+                  [attr.aria-label]="'Activar alerta de ' + alert.product.name"
+                />
+                <span class="toggle-slider" aria-hidden="true"></span>
+              </label>
+              <span class="status-text" [class.active]="alert.active" [class.inactive]="!alert.active">
+                {{ alert.active ? 'Activa' : 'Inactiva' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="alert-meta">
+            <span class="created">Creada: {{ shortDate(alert.createdAt) }}</span>
+            <span class="last-triggered" *ngIf="alert.lastTriggeredAt">
+              Última: {{ shortDate(alert.lastTriggeredAt) }}
+            </span>
+            <button class="btn-icon delete-btn" (click)="deleteAlert(alert)" aria-label="Eliminar alerta">
+              🗑️
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <p *ngIf="alerts().length === 0 && !showCreateForm()" class="empty-state">
+      No tienes alertas aún. <button (click)="toggleCreateForm()">Crea tu primera alerta</button>
+    </p>
+
+    <!-- Alert History -->
+    <section class="card" *ngIf="alertEvents().length > 0" aria-labelledby="history-title">
+      <header class="card-header">
+        <h2 id="history-title">Historial de alertas disparadas</h2>
+      </header>
+
+      <div class="events-list">
+        <article *ngFor="let event of alertEvents()" class="event-card">
+          <div class="event-info">
+            <span class="event-product">{{ event.alert.product.name }}</span>
+            <span class="event-direction" [class.below]="event.alert.direction === 'BELOW'" [class.above]="event.alert.direction === 'ABOVE'">
+              {{ event.alert.direction === 'BELOW' ? 'Bajó' : 'Subió' }} a {{ money(event.price) }}
+            </span>
+            <span class="event-target">(objetivo: {{ money(event.alert.targetPrice) }})</span>
+          </div>
+          <time class="event-time" [dateTime]="event.triggeredAt">{{ shortDate(event.triggeredAt) }}</time>
+        </article>
+      </div>
+    </section>
+
+    <p *ngIf="alertEvents().length === 0 && alerts().length > 0" class="empty-state">
+      No se han disparado alertas aún. Te notificaremos cuando un precio alcance tu objetivo.
+    </p>
+  </div>
+
+  <!-- Error Toast -->
+  <div *ngIf="error()" class="error-toast" role="alert">
+    {{ error() }}
+    <button (click)="error.set(null)" aria-label="Cerrar">×</button>
+  </div>
+</section>

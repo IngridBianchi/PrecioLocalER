@@ -1,0 +1,183 @@
+<section class="predictions" aria-label="Predicciones de precios">
+  <header class="predictions-header">
+    <div class="header-content">
+      <h1>Predicciones</h1>
+      <p class="subtitle" *ngIf="product()">{{ product().name }}</p>
+    </div>
+    <div class="header-meta" *ngIf="combined()">
+      <span class="badge" [class.weak]="combined().weak">
+        {{ combined().weak ? 'Un solo modelo' : combined().models.join(' + ') }}
+      </span>
+      <span class="agreement" *ngIf="combined().agreementRatio > 0">
+        Consenso: {{ (combined().agreementRatio * 100) | number:'1.0-0' }}%
+      </span>
+    </div>
+  </header>
+
+  <div *ngIf="loading()" class="loading-state" aria-live="polite">
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-chart"></div>
+  </div>
+
+  <div *ngIf="error()" class="error-state" role="alert">
+    <p>{{ error() }}</p>
+  </div>
+
+  <div *ngIf="!loading() && !error() && hasForecast" class="predictions-content">
+    <!-- Summary Cards -->
+    <section class="card summary-cards" aria-labelledby="summary-title">
+      <h2 id="summary-title">Resumen (7 días)</h2>
+      <div class="cards-grid">
+        <article class="summary-card">
+          <span class="label">Dirección</span>
+          <span class="value direction" [class.up]="combined().direction === 'up'" [class.down]="combined().direction === 'down'" [class.flat]="combined().direction === 'flat'">
+            {{ directionLabel(combined().direction) }}
+          </span>
+        </article>
+        <article class="summary-card">
+          <span class="label">Precio actual</span>
+          <span class="value">{{ money(firstPointPrice()) }}</span>
+        </article>
+        <article class="summary-card">
+          <span class="label">Mínimo esperado</span>
+          <span class="value low">{{ minPrice() }}</span>
+        </article>
+        <article class="summary-card">
+          <span class="label">Máximo esperado</span>
+          <span class="value high">{{ maxPrice() }}</span>
+        </article>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="card chart-card" aria-labelledby="chart-title">
+      <h2 id="chart-title">Banda de predicción</h2>
+      
+      <div class="chart-wrapper">
+        <svg class="forecast-chart" viewBox="0 0 800 300" preserveAspectRatio="none" role="img" aria-label="Gráfico de banda de predicción">
+          <defs>
+            <linearGradient id="bandGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          
+          <!-- Grid -->
+          <g class="chart-grid" *ngIf="combined()?.points?.length">
+            <line *ngFor="let y of yGridLines()" [attr.x1]="paddingLeft" [attr.y1]="y.y" [attr.x2]="chartWidth - paddingRight" [attr.y2]="y.y" stroke="var(--color-border)" stroke-width="1"/>
+            <line *ngFor="let x of xGridLines()" [attr.x1]="x" [attr.y1]="paddingTop" [attr.x2]="x" [attr.y2]="chartHeight - paddingBottom" stroke="var(--color-border)" stroke-width="1"/>
+          </g>
+
+          <!-- Band -->
+          <path *ngIf="combined()?.points?.length" 
+            [attr.d]="bandPath()" 
+            fill="url(#bandGradient)" 
+            stroke="var(--color-primary)" 
+            stroke-width="1" 
+            stroke-opacity="0.3"
+            fill-opacity="0.5"/>
+
+          <!-- Python line -->
+          <path *ngIf="pythonForecast()?.points?.length" 
+            [attr.d]="pythonPath()" 
+            stroke="var(--color-primary)" 
+            stroke-width="2" 
+            fill="none" 
+            stroke-dasharray="8,4"/>
+
+          <!-- Dotnet line -->
+          <path *ngIf="dotnetForecast()?.points?.length" 
+            [attr.d]="dotnetPath()" 
+            stroke="var(--color-success)" 
+            stroke-width="2" 
+            fill="none"/>
+
+          <!-- Points -->
+          <g *ngIf="combined()?.points?.length">
+            <circle *ngFor="let point of pythonChartPoints()" 
+              [attr.cx]="point.x" [attr.cy]="point.y" r="4" 
+              fill="var(--color-primary)" stroke="white" stroke-width="2"/>
+            <circle *ngFor="let point of dotnetChartPoints()" 
+              [attr.cx]="point.x" [attr.cy]="point.y" r="4" 
+              fill="var(--color-success)" stroke="white" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Legend -->
+      <div class="chart-legend">
+        <span class="legend-item" *ngIf="pythonForecast()?.points?.length">
+          <span class="legend-color python"></span>
+          Python ({{ pythonForecast()?.model }})
+        </span>
+        <span class="legend-item" *ngIf="dotnetForecast()?.points?.length">
+          <span class="legend-color dotnet"></span>
+          .NET ({{ dotnetForecast()?.model }})
+        </span>
+        <span class="legend-item band">
+          <span class="legend-color band-color"></span>
+          Banda de consenso
+        </span>
+      </div>
+    </section>
+
+    <!-- Detailed Table -->
+    <section class="card table-card" aria-labelledby="table-title">
+      <h2 id="table-title">Detalle día a día</h2>
+      
+      <div class="table-wrapper">
+        <table class="forecast-table">
+          <thead>
+            <tr>
+              <th scope="col">Fecha</th>
+              <th scope="col">Banda (Mín - Máx)</th>
+              <th scope="col" *ngIf="pythonForecast()?.points?.length">Python</th>
+              <th scope="col" *ngIf="dotnetForecast()?.points?.length">.NET</th>
+              <th scope="col">Dirección</th>
+              <th scope="col">Confianza</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let point of combined()?.points">
+              <td class="date">{{ dayLabel(point.date) }}</td>
+              <td class="band">
+                <span class="band-range">{{ money(point.low) }} – {{ money(point.high) }}</span>
+              </td>
+              <td *ngIf="pythonForecast()?.points?.length" class="model-value python">
+                {{ formatNumber(getPythonPrice(point.date)) }}
+              </td>
+              <td *ngIf="dotnetForecast()?.points?.length" class="model-value dotnet">
+                {{ formatNumber(getDotnetPrice(point.date)) }}
+              </td>
+              <td class="direction-cell">
+                <span class="direction-badge" 
+                  [class.up]="point.direction === 'up'" 
+                  [class.down]="point.direction === 'down'" 
+                  [class.flat]="point.direction === 'flat'"
+                  [class.weak]="point.weak">
+                  {{ directionLabel(point.direction) }}
+                </span>
+              </td>
+              <td class="confidence">
+                <span [class.weak]="point.weak">
+                  {{ point.weak ? 'Baja (1 modelo)' : 'Alta (2 modelos)' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Degraded Notice -->
+    <div *ngIf="combined().degraded.length" class="degraded-notice" role="status">
+      <span class="warning-icon">⚠️</span>
+      <span>{{ combined().degraded.join('; ') }}</span>
+    </div>
+  </div>
+
+  <p *ngIf="!loading() && !error() && !hasForecast" class="empty-state">
+    No hay datos de predicción para este producto.<br>
+    Se necesitan al menos 14 días de histórico de precios.
+  </p>
+</section>

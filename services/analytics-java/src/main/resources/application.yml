@@ -1,0 +1,119 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: analytics-java
+
+  # R2DBC PostgreSQL
+  r2dbc:
+    url: ${R2DBC_URL:r2dbc:postgresql://localhost:5432/preciolocal}
+    username: ${POSTGRES_USER:preciolocal}
+    password: ${POSTGRES_PASSWORD:preciolocal}
+    pool:
+      initial-size: 5
+      max-size: 20
+      validation-query: SELECT 1
+
+  # MongoDB Reactive
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27018/preciolocal_analytics}
+      database: preciolocal_analytics
+      auto-index-creation: true
+
+  # Redis (Lettuce reactive)
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6381}
+    password: ${REDIS_PASSWORD:}
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+
+  # WebSocket STOMP
+  websocket:
+    stomp:
+      broker:
+        enabled: true
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      alertEngine:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+
+  ratelimiter:
+    instances:
+      alertApi:
+        limitForPeriod: 60
+        limitRefreshPeriod: 60s
+        timeoutDuration: 5s
+        registerHealthIndicator: true
+
+  retry:
+    instances:
+      dbRetry:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.dao.DataAccessException
+          - io.r2dbc.spi.R2dbcException
+
+# Management / Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,ratelimiters
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    com.preciolocal.analytics: DEBUG
+    org.springframework.r2dbc: DEBUG
+    org.springframework.data.mongodb: DEBUG
+    io.lettuce.core: DEBUG
+    io.github.resilience4j: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [correlationId=%X{correlation_id:-}, userId=%X{user_id:-}] - %msg%n"
+
+# Application specific
+app:
+  redis:
+    cache-ttl-seconds: 60
+    lock-ttl-milliseconds: 300000
+    price-events-channel: "pl:events:price"
+    alert-events-channel: "pl:events:alert"
+  alert-engine:
+    buffer-size: 1000
+    window-duration-seconds: 5
+    backpressure-strategy: "BUFFER" # BUFFER, DROP, ERROR

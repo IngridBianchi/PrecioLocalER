@@ -1,0 +1,95 @@
+<section class="dashboard" aria-label="Dashboard de precios">
+  <header class="dashboard-header">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Resumen de inflación y movimientos de precios</p>
+    <div class="last-updated" *ngIf="!loading()">
+      Actualizado: {{ formattedDate }}
+    </div>
+    <p
+      class="demo-notice"
+      *ngIf="!loading() && !error() && !hasInflationData()"
+      role="status"
+    >
+      Las cifras de inflación todavía no están disponibles; la estructura es de
+      demostración.
+    </p>
+  </header>
+
+  <div *ngIf="loading()" class="loading-state" aria-live="polite">
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+  </div>
+
+  <div *ngIf="error()" class="error-state" role="alert">
+    <p>{{ error() }}</p>
+    <button (click)="loadDashboardData()">Reintentar</button>
+  </div>
+
+  <div *ngIf="!loading() && !error()" class="dashboard-content">
+    <!-- Inflación general -->
+    <section class="card inflation-overview" aria-labelledby="inflation-title">
+      <h2 id="inflation-title">Inflación general (30 días)</h2>
+      <ng-container *ngIf="hasInflationData(); else noInflation">
+        <div class="inflation-value" [class.positive]="overallInflation > 0" [class.negative]="overallInflation < 0">
+          <span class="inflation-arrow" aria-hidden="true">{{ overallInflation > 0 ? '▲' : overallInflation < 0 ? '▼' : '•' }}</span>
+          {{ overallInflation > 0 ? '+' : '' }}{{ overallInflation | number:'1.1-1' }}%
+        </div>
+        <p class="inflation-label">Variación promedio ponderada</p>
+      </ng-container>
+      <ng-template #noInflation>
+        <p class="empty">El reporte de inflación aún no está disponible.</p>
+      </ng-template>
+    </section>
+
+    <!-- Inflación por categoría -->
+    <section class="card inflation-categories" aria-labelledby="categories-title">
+      <h2 id="categories-title">Por categoría</h2>
+      <div class="categories-grid">
+        <article *ngFor="let cat of categories" class="category-card">
+          <header>
+            <h3>{{ cat.category.name }}</h3>
+            <span class="count">{{ cat.productCount }} productos</span>
+          </header>
+          <div class="category-inflation" [class.positive]="cat.inflation > 0" [class.negative]="cat.inflation < 0">
+            {{ cat.inflation > 0 ? '+' : '' }}{{ cat.inflation | number:'1.1-1' }}%
+          </div>
+          <p class="avg-change">Promedio: {{ cat.avgPriceChange > 0 ? '+' : '' }}{{ cat.avgPriceChange | number:'1.1-1' }}%</p>
+        </article>
+      </div>
+      <p class="empty" *ngIf="categories.length === 0">No hay datos de inflación por categoría</p>
+    </section>
+
+    <!-- Top Movers -->
+    <section class="card movers" aria-labelledby="movers-title">
+      <h2 id="movers-title">Mayores movimientos (30 días)</h2>
+      <div class="movers-grid">
+        <article class="movers-column gainers">
+          <h3>📈 Subidas</h3>
+          <ul *ngIf="topGainers().length > 0; else noGainers">
+            <li *ngFor="let m of topGainers()">
+              <span class="product-name">{{ m.product.name }}</span>
+              <span class="chain-badge">{{ m.chain.name }}</span>
+              <span class="change positive">{{ m.priceChangePct > 0 ? '+' : '' }}{{ m.priceChangePct | number:'1.1-1' }}%</span>
+              <span class="prices">{{ money(m.currentPrice) }} ← {{ money(m.previousPrice) }}</span>
+            </li>
+          </ul>
+          <ng-template #noGainers><p class="empty">Sin subidas significativas</p></ng-template>
+        </article>
+
+        <article class="movers-column losers">
+          <h3>📉 Bajadas</h3>
+          <ul *ngIf="topLosers().length > 0; else noLosers">
+            <li *ngFor="let m of topLosers()">
+              <span class="product-name">{{ m.product.name }}</span>
+              <span class="chain-badge">{{ m.chain.name }}</span>
+              <span class="change negative">{{ m.priceChangePct | number:'1.1-1' }}%</span>
+              <span class="prices">{{ money(m.currentPrice) }} ← {{ money(m.previousPrice) }}</span>
+            </li>
+          </ul>
+          <ng-template #noLosers><p class="empty">Sin bajadas significativas</p></ng-template>
+        </article>
+      </div>
+    </section>
+  </div>
+</section>

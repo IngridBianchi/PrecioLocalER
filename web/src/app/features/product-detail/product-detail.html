@@ -1,0 +1,173 @@
+@if (loading()) {
+  <p class="state" role="status">Cargando producto…</p>
+}
+
+@if (error(); as message) {
+  <p class="state error" role="alert">{{ message }}</p>
+  <p><a routerLink="/">← Volver a la búsqueda</a></p>
+}
+
+@if (product(); as product) {
+  <a routerLink="/" class="back">← Volver a la búsqueda</a>
+
+  <header class="head">
+    <h2>{{ product.name }}</h2>
+    <p class="meta">
+      {{ product.brand ?? 'Sin marca' }}{{ product.category ? ' · ' + product.category : '' }}
+    </p>
+    @if (product.size_quantity) {
+      <p class="meta">Presentación: {{ product.size_quantity }} {{ product.size_unit }}</p>
+    }
+  </header>
+
+  <section class="current" aria-label="Precio vigente">
+    @if (latestPromo(); as promo) {
+      <span class="badge promo">{{ formatPromo(promo) }}</span>
+    }
+    <span class="price">{{ formatPrice(latestPrice()) }}</span>
+    @if (latestCapture(); as captured) {
+      <span class="meta">Actualizado {{ formatFullDate(captured) }}</span>
+    }
+  </section>
+
+  @if (chains().length > 0) {
+    <div class="filter">
+      <app-chain-picker
+        [chains]="chains()"
+        [value]="chain()"
+        label="Cadena del producto"
+        (valueChange)="setChain($event)"
+      />
+    </div>
+  }
+
+  <section class="chart-card" aria-label="Evolución de precio">
+    <div class="chart-head">
+      <h3>Evolución de precio</h3>
+      <div class="spans" role="group" aria-label="Período del gráfico">
+        @for (s of spans; track s) {
+          <button
+            type="button"
+            class="span"
+            [class.active]="span() === s"
+            (click)="setSpan(s)"
+          >
+            @switch (s) {
+              @case ('7d') {
+                7 días
+              }
+              @case ('30d') {
+                30 días
+              }
+              @default {
+                90 días
+              }
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (history().length === 0 && !forecast()?.points?.length) {
+      <p class="meta">Sin datos de precio en este período.</p>
+    } @else {
+      <div class="chart-wrap">
+        <canvas #chart aria-label="Gráfico de evolución de precio y banda de predicción"></canvas>
+      </div>
+    }
+  </section>
+
+  @if (forecast(); as combined) {
+    @if (combined.points.length > 0) {
+      <section class="forecast-card" aria-label="Predicción de precio">
+        <div class="forecast-head">
+          <h3>Predicción a 7 días</h3>
+          <span
+            [class]="directionClass(combined.direction)"
+            [title]="combined.direction === null ? 'Los dos modelos no coinciden' : 'Coinciden ambos modelos'"
+          >
+            {{ formatDirection(combined.direction) }}
+          </span>
+        </div>
+
+        @if (lastPoint(); as last) {
+          <p class="range">
+            <span class="range-value">{{ formatPrice(last.low) }}</span>
+            <span class="range-sep">a</span>
+            <span class="range-value">{{ formatPrice(last.high) }}</span>
+            <span class="meta">al {{ formatDay(last.date) }}</span>
+          </p>
+        }
+
+        <p class="meta">
+          @if (combined.weak) {
+            Un solo modelo respondió: la banda no tiene contraste.
+          } @else {
+            Holt-Winters y SsaForecaster coinciden en el
+            {{ formatAgreement(combined.agreementRatio) }} de los días proyectados.
+          }
+        </p>
+
+        @if (combined.degraded.length > 0) {
+          <ul class="degraded">
+            @for (reason of combined.degraded; track reason) {
+              <li>{{ reason }}</li>
+            }
+          </ul>
+        }
+
+        <table class="band">
+          <caption class="visually-hidden">Banda de predicción por día</caption>
+          <thead>
+            <tr>
+              <th scope="col">Día</th>
+              <th scope="col">Rango</th>
+              <th scope="col">Tendencia</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (point of combined.points; track point.date) {
+              <tr [class.weak]="point.weak">
+                <td>{{ formatDay(point.date) }}</td>
+                <td>{{ formatPrice(point.low) }} – {{ formatPrice(point.high) }}</td>
+                <td>
+                  <span [class]="directionClass(point.direction, 'small')">
+                    {{ formatDirection(point.direction) }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    } @else {
+      <section class="forecast-card" aria-label="Predicción de precio">
+        <h3>Predicción</h3>
+        <p class="meta">No hay histórico suficiente para proyectar este producto.</p>
+        @if (combined.degraded.length > 0) {
+          <ul class="degraded">
+            @for (reason of combined.degraded; track reason) {
+              <li>{{ reason }}</li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  } @else if (forecastLoading()) {
+    <p class="state" role="status">Calculando predicción…</p>
+  }
+
+  @if (product.prices.length > 1) {
+    <section class="by-chain" aria-label="Precio por cadena">
+      <h3>Precio por cadena</h3>
+      <ul>
+        @for (p of product.prices; track p.hash) {
+          <li [class.active]="chain() === p.chain">
+            <span class="meta">{{ p.chain }}</span>
+            <span class="price small">{{ formatPrice(p.price) }}</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+}

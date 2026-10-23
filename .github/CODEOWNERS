@@ -1,0 +1,7 @@
+# Propietarios por defecto: 1 no autor de la PR debe aprobar.
+# (Fase 1+: se asigna por servicio cuando haya múltiples contribuidores.)
+
+* @USER
+
+# Áreas sensibles (decisiones de arquitectura)
+docs/adr/ @USER

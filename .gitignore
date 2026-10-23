@@ -1,0 +1,63 @@
+# ---- Dependencias / entornos ----
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+# .env.example se versiona a propósito (plantilla sin secretos)
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.egg-info/
+
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+
+# ---- Java ----
+target/
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# ---- Angular ----
+web/.angular/
+web/www/
+
+# ---- IDE / SO ----
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- Docker ----
+*.log
+
+# ---- Secretos (nunca versionar) ----
+*.key
+*.pem
+secrets/
+
+
+project.md
+BLOG_POST.md
+MANUAL.md
+AGENTS.md
+ANALISIS_CHAIN_ACTIVE_Y_MEJORAS_FRONTEND.md
+CONTEXTO.md
+FIX_CHAIN_ACTIVE.md
+SITUACIÓNACTUAL.md
+PLAN.md
+

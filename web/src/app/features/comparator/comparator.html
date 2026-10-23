@@ -1,0 +1,126 @@
+<section class="comparator" aria-label="Comparador de productos">
+  <header class="comparator-header">
+    <h1>Comparador</h1>
+    <p class="subtitle">Compara hasta 3 productos entre cadenas</p>
+  </header>
+
+  <!-- Search & Selection -->
+  <section class="card selection-panel" aria-labelledby="selection-title">
+    <h2 id="selection-title">Seleccionar productos</h2>
+
+    <div class="search-box">
+      <label for="search-input" class="visually-hidden">Buscar producto</label>
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Buscar producto (ej: aceite, leche, pan)..."
+        [value]="searchQuery()"
+        (input)="onSearchInput($event)"
+        (focus)="searchQuery().length >= 2 && (showSearchResults.set(true))"
+        (blur)="onSearchBlur()"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="search-results"
+        [attr.aria-expanded]="showSearchResults()"
+      />
+      <div id="search-results" class="search-results" *ngIf="showSearchResults() && searchResults().length > 0">
+        <ul role="listbox" aria-label="Productos encontrados">
+          <li *ngFor="let result of searchResults()" role="option" (click)="addProduct(result)">
+            <span class="result-name">{{ result.name }}</span>
+            <span class="result-brand">{{ result.brand }}</span>
+            <span class="result-category">{{ result.category }}</span>
+          </li>
+        </ul>
+      </div>
+      <p class="search-hint" *ngIf="showSearchResults() && searchResults().length === 0 && searchQuery().length >= 2">
+        Sin resultados para "{{ searchQuery() }}"
+      </p>
+    </div>
+
+    <!-- Selected Products -->
+    <div class="selected-products" *ngIf="selectedProducts().length > 0">
+      <h3>Seleccionados ({{ selectedProducts().length }}/3)</h3>
+      <div class="selected-chips">
+        <span class="chip" *ngFor="let p of selectedProducts()">
+          {{ p.name }}
+          <button type="button" (click)="removeProduct(p.id)" aria-label="Quitar {{ p.name }}">×</button>
+        </span>
+      </div>
+      <div class="selection-actions">
+        <button 
+          class="btn btn-primary" 
+          (click)="compare()" 
+          [disabled]="selectedProducts().length < 2 || loading()"
+        >
+          {{ loading() ? 'Comparando...' : 'Comparar' }}
+        </button>
+        <button 
+          class="btn btn-secondary" 
+          (click)="clearAll()"
+          [disabled]="selectedProducts().length === 0"
+        >
+          Limpiar
+        </button>
+      </div>
+    </div>
+
+    <p class="empty-hint" *ngIf="selectedProducts().length === 0">
+      <svg class="empty-illustration" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+      </svg>
+      Busca y selecciona al menos 2 productos para comparar
+    </p>
+  </section>
+
+  <!-- Comparison Table -->
+  <section class="card comparison-panel" *ngIf="hasComparison" aria-labelledby="comparison-title">
+    <h2 id="comparison-title">Comparación de precios</h2>
+
+    <div class="table-wrapper" role="region" aria-label="Tabla de comparación" tabindex="0">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th scope="col">Producto</th>
+            <th scope="col" *ngFor="let chain of allChains">{{ chainLabel(chain) }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let product of selectedProducts()">
+            <th scope="row" class="product-cell">
+              <span class="product-name">{{ product.name }}</span>
+              <span class="product-meta" *ngIf="product.brand">
+                {{ product.brand.name }} · {{ product.sizeQuantity }}{{ product.sizeUnit }}
+              </span>
+            </th>
+            <td *ngFor="let chain of allChains" class="price-cell">
+              <ng-container *ngIf="getPriceForChain(product, chain) as priceData; else noPrice">
+                <span class="price" [class.promo]="priceData.promo">{{ money(priceData.price) }}</span>
+                <span class="promo-badge" *ngIf="priceData.promo">{{ promoLabel(priceData.promo) }}</span>
+                <time class="captured-at" [dateTime]="priceData.capturedAt">{{ shortDate(priceData.capturedAt) }}</time>
+              </ng-container>
+              <ng-template #noPrice>
+                <span class="no-price">—</span>
+              </ng-template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="comparison-note">
+      Los precios son los más recientes capturados por cadena. 
+      <span *ngIf="hasAnyPromo()">
+        Las etiquetas indican precios promocionales.
+      </span>
+    </p>
+  </section>
+
+  <!-- Error State -->
+  <div *ngIf="error()" class="error-toast" role="alert">
+    {{ error() }}
+    <button (click)="error.set(null)" aria-label="Cerrar">×</button>
+  </div>
+</section>
