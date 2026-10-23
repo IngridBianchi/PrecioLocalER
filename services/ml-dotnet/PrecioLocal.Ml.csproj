@@ -14,9 +14,9 @@
          Mkl.Redist trae libMklImports.so, que el SVD de SSA necesita;
          su dependencia libiomp5.so la instala el Dockerfile (Intel
          oneAPI runtime, apt firmado). -->
-    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
-    <PackageReference Include="Microsoft.ML.Mkl.Redist" Version="3.0.1" />
-    <PackageReference Include="Microsoft.ML.TimeSeries" Version="3.0.1" />
+    <PackageReference Include="Microsoft.ML" Version="5.0.1" />
+    <PackageReference Include="Microsoft.ML.Mkl.Redist" Version="5.0.1" />
+    <PackageReference Include="Microsoft.ML.TimeSeries" Version="5.0.1" />
   </ItemGroup>
 
   <ItemGroup>
