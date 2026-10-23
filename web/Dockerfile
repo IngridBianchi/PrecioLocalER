@@ -4,7 +4,7 @@
 # http://scraper:8000 (ver docker/nginx.conf).
 
 # ---- Stage 1: build ----
-FROM node:20-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install --legacy-peer-deps
