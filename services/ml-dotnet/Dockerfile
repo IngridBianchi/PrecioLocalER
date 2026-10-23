@@ -1,7 +1,7 @@
 # Imagen del servicio ml-dotnet (.NET 8 + ML.NET).
 # Hardening WP1: non-root, restore en capa cacheable, healthcheck real.
 # Uso: docker build -t preciolocal-ml-dotnet services/ml-dotnet
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY PrecioLocal.Ml.csproj ./
