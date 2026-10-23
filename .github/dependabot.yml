@@ -7,6 +7,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "python"
@@ -21,6 +24,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "frontend"
@@ -35,6 +41,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "docker"
@@ -49,6 +58,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "docker"
@@ -63,6 +75,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "docker"
@@ -77,6 +92,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "docker"
@@ -91,6 +109,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "docker"
@@ -105,6 +126,9 @@ updates:
       day: "monday"
       time: "06:00"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "dotnet"
