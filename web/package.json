@@ -39,7 +39,7 @@
     "apollo-angular": "^7.0.0",
     "chart.js": "^4.5.1",
     "graphql": "^16.9.0",
-    "graphql-ws": "^5.16.0",
+    "graphql-ws": "^6.4.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
