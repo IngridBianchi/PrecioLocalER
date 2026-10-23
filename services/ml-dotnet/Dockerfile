@@ -18,7 +18,7 @@ RUN dotnet publish PrecioLocal.Ml.csproj \
         -o /app/publish \
         /p:UseAppHost=true
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # El SVD de SsaForecaster es MKL: libMklImports.so (que llega por NuGet)
