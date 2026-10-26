@@ -179,7 +179,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Instala dependencias
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       - name: Tests (Karma/ChromeHeadless)
         run: npx ng test --watch=false --browsers=ChromeHeadless
       - name: Build de producción
