@@ -103,7 +103,8 @@ class ProductRepository:
         """
         row = await self._provider.pool.fetchrow(
             """
-            INSERT INTO products (name, normalized_name, size_quantity, size_unit, category_id, created_at)
+            INSERT INTO products (name, normalized_name, size_quantity, size_unit,
+                                  category_id, created_at)
             VALUES ($1, $2, $3, $4, $5, now())
             ON CONFLICT (normalized_name)
             DO UPDATE SET name = EXCLUDED.name,

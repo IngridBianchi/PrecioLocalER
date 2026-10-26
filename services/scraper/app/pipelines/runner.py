@@ -8,7 +8,6 @@ from app.models import PricePointIn, ProductIn, ScrapeSummary, SkuIn
 from app.pipelines.dedupe import compute_price_hash
 from app.pipelines.normalize import extract_size, normalize_name
 
-
 _CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "aceites": ("aceite",),
     "harinas": ("harina",),
@@ -56,7 +55,7 @@ class ScrapeRunner:
         scraper: BaseScraper,
         repository: ProductRepository,
         chain: str,
-        redis: "RedisReadiness | None" = None,
+        redis: RedisReadiness | None = None,
     ) -> None:
         self._scraper = scraper
         self._repo = repository
@@ -80,9 +79,12 @@ class ScrapeRunner:
             try:
                 size = extract_size(raw.name)
                 normalized = normalize_name(raw.name)
-                category_id = await self._repo.category_id_by_path(getattr(raw, "category_path", None))
+                category_path = getattr(raw, "category_path", None)
+                category_id = await self._repo.category_id_by_path(category_path)
                 if category_id is None:
-                    category_id = await self._repo.category_id_by_slug(_infer_category_slug(raw.name))
+                    category_id = await self._repo.category_id_by_slug(
+                        _infer_category_slug(raw.name)
+                    )
                 product_id = await self._repo.upsert_product(
                     ProductIn(
                         name=raw.name,

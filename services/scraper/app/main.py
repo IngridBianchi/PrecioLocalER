@@ -28,7 +28,6 @@ from app.observability import (
     CorrelationIdMiddleware,
     _setup_prometheus,
     _setup_structured_logging,
-    setup_observability,
 )
 from app.state import AppState
 

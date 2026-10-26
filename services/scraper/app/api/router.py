@@ -1,7 +1,6 @@
 """Endpoints públicos del scraper (contrato en docs/contracts.md §3.1)."""
 from __future__ import annotations
 
-import asyncio
 import secrets
 import subprocess
 import sys
