@@ -30,7 +30,11 @@ jobs:
           POSTGRES_PASSWORD: ci-config-only
           MONGO_PASSWORD: ci-config-only
           REDIS_PASSWORD: ci-config-only
+          SCRAPER_DB_PASSWORD: ci-config-only
+          ML_DB_PASSWORD: ci-config-only
           ANALYTICS_DB_PASSWORD: ci-config-only
+          TRUSTED_PROXY_IP: 10.99.0.10
+          SUPABASE_JWKS_URL: ""
         run: docker compose config --quiet
 
       - name: Valida estructura de docs/ADRs
@@ -158,7 +162,7 @@ jobs:
           PY
 
       - name: Sube cobertura a Codecov
-        uses: codecov/codecov-action@b9f7d17afd73a095d8732de6b90663f61bb495b # v5.5.1
+        uses: codecov/codecov-action@v5
         with:
           files: services/scraper/coverage.xml
           fail_ci_if_error: true
@@ -331,7 +335,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Instala el runtime de Intel OpenMP (libiomp5.so)
-        run: sudo ./scripts/install-mkl-runtime.sh
+        run: sudo bash scripts/install-mkl-runtime.sh
 
       - name: Build
         run: dotnet build -c Release
