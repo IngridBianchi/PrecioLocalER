@@ -85,4 +85,4 @@ Este proyecto raspa sitios públicos de retail con fines educativos y de investi
 
 ## Contacto
 
-Autor: Víctor Parra — [LinkedIn](https://linkedin.com/in/vparr) · [GitHub](https://github.com/vparr) · vparr@example.com
+Autor: Ingrid Bianchi — [LinkedIn]([https://www.linkedin.com/in/ingrid-lorena-bianchi/]) · [GitHub]([https://github.com/IngridBianchi]) · bianchi.ingrid204gmail.com
