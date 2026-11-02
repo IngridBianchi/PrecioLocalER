@@ -1,7 +1,7 @@
 # Imagen del servicio scraper (Python 3.12 + FastAPI).
 # Hardening WP1: usuario no-root, sin cache de pip, imagen mínima.
 # Uso: docker compose build scraper  ·  docker compose up scraper
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
